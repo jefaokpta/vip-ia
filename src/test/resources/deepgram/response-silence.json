@@ -1,0 +1,18 @@
+{
+  "metadata": {
+    "transaction_key": "deprecated",
+    "request_id": "req-silence",
+    "sha256": "def456",
+    "created": "2026-10-15T12:00:00.000Z",
+    "duration": 7.0,
+    "channels": 1,
+    "models": ["model-uuid"],
+    "model_info": {"model-uuid": {"name": "general-nova-3", "version": "2025-01-01", "arch": "nova-3"}}
+  },
+  "results": {
+    "channels": [
+      {"alternatives": [{"transcript": "", "confidence": 0.0, "words": []}]}
+    ],
+    "utterances": []
+  }
+}

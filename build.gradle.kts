@@ -26,6 +26,7 @@ dependencies {
     implementation("org.springframework.kafka:spring-kafka")
     implementation(platform("software.amazon.awssdk:bom:2.41.6"))
     implementation("software.amazon.awssdk:s3")
+    implementation("com.deepgram:deepgram-java-sdk:0.11.1")
     implementation("io.micrometer:micrometer-registry-prometheus")
     implementation("org.jetbrains.kotlin:kotlin-reflect")
     implementation("tools.jackson.module:jackson-module-kotlin")
