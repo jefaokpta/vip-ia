@@ -1,7 +1,7 @@
 # Manifesto — vip-ia
 
 > Serviço de Inteligência Artificial da plataforma VIP PABX. Quinto app do workspace.
-> Data: 2026-10-14 · Status: design aprovado, implementação não iniciada.
+> Data: 2026-10-14 (revisado em 2026-10-15) · Status: design aprovado, implementação não iniciada.
 
 ## 1. Por que existe
 
@@ -18,8 +18,8 @@ geradas por agentes de IA que o próprio cliente escolhe (ou cria) e aplica às 
 
 1. O manager recebe a CDR do vip-worker (fluxo atual) e, **se a empresa tem o módulo de IA**, republica a CDR no
    tópico `KAFKA_MANAGER_IA_CDR_TOPIC`.
-2. O `vip-ia` consome esse tópico e cria uma tarefa de transcrição por arquivo em `callRecords`.
-3. Baixa a gravação do S3 (`recordings/{companyId}/{arquivo}.mp3`, bucket de gravações do vip-worker).
+2. O `vip-ia` consome esse tópico e cria uma tarefa de transcrição por gravação em `recordNames`.
+3. Baixa a gravação do S3 (`recordings/{companyId}/{recordName}.mp3`, bucket de gravações do vip-worker).
 4. Transcreve com a **Deepgram** (SDK Java) e grava texto + falas por locutor no MySQL próprio.
 5. Registra o consumo (segundos de áudio) para faturamento.
 6. Expõe as transcrições ao frontend via API REST própria.
@@ -38,8 +38,8 @@ geradas por agentes de IA que o próprio cliente escolhe (ou cria) e aplica às 
 
 | Tema | Decisão |
 |------|---------|
-| Stack | Kotlin 2.2+, **Spring Boot 4.x**, JDK 21 (virtual threads), Spring Data JDBC, MySQL 8 próprio |
-| Transcrição | **Deepgram Java SDK** — `transcribeFile(bytes)` com `nova-3`, `pt-BR`, `diarize`, `utterances`, `punctuate`, `smart_format` |
+| Stack | Kotlin 2.3.21, **Spring Boot 4.1.x** (mesmas versões do vip-worker), JDK 21 (virtual threads), Spring Data JDBC, MySQL 8 próprio |
+| Transcrição | **Deepgram Java SDK 0.11.1** — `transcribeFile(MediaTranscribeRequestOctetStream)` com `nova-3`, `pt-BR`, `diarize`, `utterances`, `punctuate`, `smart_format` |
 | LLM | **Spring AI 2.x** (`spring-ai-starter-model-openai`) com `base-url` do OpenRouter; modelo definido por agente |
 | Entrada | Tópico **novo publicado pelo manager** (`KAFKA_MANAGER_IA_CDR_TOPIC`); o vip-ia **não** consome `KAFKA_WORKER_CDR_TOPIC` |
 | API | REST própria na porta **8083**, validando o **JWT do manager** (`HMAC512(AUTH_JWT_SECRET)`, issuer `"VIP API"`) |
@@ -76,8 +76,9 @@ vip-worker ──CDR──> vip-pabx-manager ──(empresa tem módulo IA?)─�
 
 ### Por que fila no banco e não processar no listener
 
-- A gravação pode **ainda não estar no S3** quando a CDR chega (o vip-worker converte `.sln → .mp3` e sobe de forma
-  assíncrona em `RecordConversionService`). Esperar dentro do listener travaria a partição.
+- A gravação **ainda não está no S3** quando a CDR chega: o vip-worker publica a CDR e só depois converte
+  `.sln → .mp3` e sobe (`CdrService.sendCdr` → `RecordConversionService`, numa única virtual thread serial).
+  Esperar dentro do listener travaria a partição.
 - Falhas da Deepgram/OpenRouter não perdem a mensagem; restart não perde trabalho.
 - Controle explícito de concorrência = controle de custo e de rate limit.
 
@@ -109,12 +110,16 @@ Tópico `KAFKA_MANAGER_IA_CDR_TOPIC`, JSON:
   "peer": "12",
   "disposition": "ANSWERED",
   "userfield": "OUTBOUND",
-  "callRecords": ["1772633126.1880.mp3"]
+  "recordNames": ["100023-1772633126.1880-MIXED"]
 }
 ```
 
-- O golden file fica em `src/test/resources/kafka-contracts/` nos **dois** lados (manager e vip-ia).
-- CDR sem `callRecords` → tarefa não é criada (ou registrada como `SKIPPED` para auditoria).
+- `startTime` em **epoch millis** (mesmo formato do `Date` serializado no tópico de CDR do worker).
+- `recordNames`: os `mixedRecord` (sem extensão) de `channelInteractions` da CDR. **Atenção:** o campo
+  `callRecords` da CDR do worker existe mas vem sempre vazio — as gravações reais estão em
+  `channelInteractions[].mixedRecord`. O vip-ia monta a chave `recordings/{companyId}/{recordName}.mp3`.
+- O golden file fica em `src/test/resources/kafka-contracts/ia-cdr-message.json` nos **dois** lados (manager e vip-ia).
+- CDR sem `recordNames` → nenhuma tarefa é criada (só log).
 - **Pendência no manager:** criar a flag de módulo de IA por empresa, o novo tópico e o produtor da mensagem.
 
 ## 6. Modelo de dados
@@ -122,20 +127,22 @@ Tópico `KAFKA_MANAGER_IA_CDR_TOPIC`, JSON:
 ### Fase 1
 
 **`transcription`**
-- `id`, `company_id`, `cdr_unique_id`, `record_file`
-- `status` (`PENDING`, `PROCESSING`, `RETRY`, `DONE`, `FAILED`, `SKIPPED`), `attempts`, `next_attempt_at`, `last_error`
+- `id`, `company_id`, `cdr_unique_id`, `record_name`
+- `status` (`PENDING`, `PROCESSING`, `RETRY`, `DONE`, `FAILED`), `attempts`, `next_attempt_at`, `last_error`
 - Metadados da CDR: `call_start_time`, `src`, `destination`, `peer`, `disposition`, `userfield`, `call_duration`
 - Resultado: `audio_seconds`, `language`, `model`, `deepgram_request_id`, `transcript` (TEXT)
 - `created_at`, `updated_at`
-- **Única:** `(company_id, cdr_unique_id, record_file)`; índices por `(company_id, call_start_time)` e `(status, next_attempt_at)`
+- **Única:** `(company_id, cdr_unique_id, record_name)`; índices por `(company_id, call_start_time)` e `(status, next_attempt_at)`
 
 **`transcription_utterance`**
 - `id`, `transcription_id`, `speaker`, `start_seconds`, `end_seconds`, `text`, `confidence`
 
 **`usage_record`**
 - `id`, `company_id`, `type` (`TRANSCRIPTION`, `AGENT_RUN`), `reference_id`, `provider` (`DEEPGRAM`, `OPENROUTER`),
-  `model`, `audio_seconds`, `input_tokens`, `output_tokens`, `cost`, `created_at`
+  `model`, `audio_seconds`, `input_tokens`, `output_tokens`, `cost` (nullable), `created_at`
 - Índice por `(company_id, created_at)`
+- A Deepgram não devolve custo na resposta: em transcrições `cost` fica NULL e o relatório financeiro aplica o
+  preço por minuto sobre `audio_seconds`. No OpenRouter o custo vem na resposta e é gravado.
 
 ### Fase 2
 
@@ -182,7 +189,7 @@ Todas as rotas exigem o JWT do manager e filtram por `companyId` do token.
 
 | Situação | Ação |
 |----------|------|
-| Gravação ainda não existe no S3 | `RETRY` com backoff exponencial (limite configurável, ex.: 6 tentativas em ~1h) → `FAILED` |
+| Gravação ainda não existe no S3 | `RETRY` com backoff exponencial (limite configurável; padrão 6 tentativas com base 1min ≈ 31min) → `FAILED` |
 | Deepgram/OpenRouter 5xx, 429, timeout | `RETRY` com backoff |
 | Deepgram/OpenRouter 4xx de requisição | `FAILED` com `last_error` |
 | Saída do agente fora dos labels/schema | Conta como falha → `RETRY` → `FAILED` |
@@ -209,8 +216,8 @@ Todas as rotas exigem o JWT do manager e filtram por `companyId` do token.
 
 ## 11. Riscos e pontos de atenção
 
-- **Spring Boot 4 / Spring AI 2 / Jackson 3 / Kotlin 2.2** divergem dos outros apps (Boot 3.5, Kotlin 1.9.25):
-  código e configuração não são diretamente reaproveitáveis.
+- **Spring Boot 4.1 / Jackson 3 / Kotlin 2.3** alinham com o vip-worker, mas divergem do manager e do register
+  (Boot 3.5, Kotlin 1.9.25, Jackson 2): código desses dois não é diretamente reaproveitável.
 - **Custo:** transcrição de todas as chamadas de empresas com módulo ativo + agentes automáticos. Concorrência
   limitada e `usage_record` desde o primeiro dia.
 - **LGPD:** transcrições contêm dados pessoais. Acesso sempre restrito por `companyId`; retenção a definir.

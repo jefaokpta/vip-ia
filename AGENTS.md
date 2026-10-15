@@ -10,8 +10,9 @@ Este arquivo orienta agentes de IA (Claude Code, OpenCode etc.) que trabalham ne
 - Comunique-se sempre em **português do Brasil**. Comentários e logs também em pt-BR, no estilo do código existente.
 - Trabalhe sempre na branch **`dev`**. **Nunca** faça commit, implementação ou merge direto em `main`/`master`.
 - Use o **Context7 MCP** antes de escrever código com Spring Boot 4, Spring AI 2, Kotlin, Deepgram Java SDK,
-  AWS SDK (S3), Spring Kafka e Docker. As APIs do Boot 4 / Spring AI 2 / Jackson 3 mudaram bastante em relação
-  aos outros apps do workspace — **não copie código de lá sem conferir**.
+  AWS SDK (S3), Spring Kafka e Docker. O **vip-worker** já está em Spring Boot 4.1 / Kotlin 2.3 e é a referência
+  de padrões; o manager e o register ainda estão em Boot 3.5 / Kotlin 1.9 (Jackson 2) — **não copie código deles
+  sem adaptar**.
 - Rode os testes com **`./tests.sh`** (carrega o `.env`), nunca `./gradlew test` puro, salvo teste único (abaixo).
 
 ## Contexto
@@ -22,8 +23,8 @@ Este arquivo orienta agentes de IA (Claude Code, OpenCode etc.) que trabalham ne
 |----------------------|--------------------------|-------|--------------------------------------------------------------------|
 | **vip-pabx-manager** | Kotlin/Spring Boot 3.5   | 8080  | API core: CRUDs, tarifação de CDR, autenticação (emite o JWT)      |
 | **vip-register**     | Kotlin/Spring Boot 3.5   | 8081  | Configuração do Asterisk, AMI, anti-invasão                        |
-| **vip-worker**       | Kotlin/Spring Boot 3.5   | 8082  | Chamadas em tempo real via ARI; grava e sobe as gravações no S3    |
-| **vip-ia**           | Kotlin/Spring Boot 4     | 8083  | Transcrição de chamadas (Deepgram) e agentes de IA (OpenRouter)    |
+| **vip-worker**       | Kotlin/Spring Boot 4.1   | 8082  | Chamadas em tempo real via ARI; grava e sobe as gravações no S3    |
+| **vip-ia**           | Kotlin/Spring Boot 4.1   | 8083  | Transcrição de chamadas (Deepgram) e agentes de IA (OpenRouter)    |
 | **frontend**         | Angular 19               | 4200  | UI: relatórios, WebPhone (JsSIP), gestão de usuários               |
 
 Resumo do que o serviço faz (detalhes em `MANIFESTO.md`):
@@ -35,12 +36,13 @@ Resumo do que o serviço faz (detalhes em `MANIFESTO.md`):
 
 ## Stack
 
-- **Kotlin 2.2+**, **JDK 21** com **virtual threads** (`spring.threads.virtual.enabled=true`).
-- **Spring Boot 4.x** — Jackson 3 (`tools.jackson.*`) é o padrão; configure o compilador Kotlin com
+- **Kotlin 2.3.21**, **JDK 21** com **virtual threads** (`spring.threads.virtual.enabled=true`) — mesmas versões do vip-worker.
+- **Spring Boot 4.1.x** — Jackson 3 (`tools.jackson.*`) é o padrão; configure o compilador Kotlin com
   `-Xannotation-default-target=param-property` (recomendação da doc do Boot 4).
-- **Spring AI 2.x** — `spring-ai-starter-model-openai` apontado para o OpenRouter via
+- **Spring AI 2.x** (fase 2) — `spring-ai-starter-model-openai` apontado para o OpenRouter via
   `spring.ai.openai.base-url=https://openrouter.ai/api`; o modelo de cada agente é passado por `OpenAiChatOptions`.
-- **Deepgram Java SDK** (`com.deepgram:deepgram-java-sdk`) — `client.listen().v1().media().transcribeFile(bytes)`.
+- **Deepgram Java SDK** (`com.deepgram:deepgram-java-sdk:0.11.1`) — `client.listen().v1().media().transcribeFile(request)`.
+  O SDK usa Jackson 2 internamente (convive com o Jackson 3 do Boot); não misture os dois no código do app.
 - **AWS SDK v2 (S3)** — leitura do bucket de gravações (`recordings/{companyId}/{arquivo}.mp3`).
 - **Spring Kafka**, **Spring Data JDBC** (não JPA), **MySQL 8** em produção, **H2** (modo MySQL) nos testes.
 - **Spring Security** + `com.auth0:java-jwt` para validar o JWT emitido pelo manager.
@@ -71,11 +73,12 @@ Teste único — o profile de teste usa valores fixos, então `.env` não é nec
 | `KAFKA_BOOTSTRAP_SERVERS` / `KAFKA_SASL_USERNAME` / `KAFKA_SASL_PASSWORD` | Kafka da plataforma    |
 | `KAFKA_MANAGER_IA_CDR_TOPIC`      | Tópico onde o manager publica as CDRs com módulo de IA         |
 | `KAFKA_GROUP_ID`                  | Consumer group do vip-ia                                       |
-| `AWS_REGION` / `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` | Acesso ao S3                        |
+| `AWS_S3_REGION` / `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` | Acesso ao S3                     |
 | `AWS_S3_RECORDINGS_BUCKET`        | Bucket das gravações (o mesmo em que o vip-worker faz upload)  |
 | `DEEPGRAM_API_KEY`                | Chave da Deepgram                                              |
 | `OPENROUTER_API_KEY`              | Chave do OpenRouter (fase 2)                                   |
 | `AUTH_JWT_SECRET`                 | **Mesmo segredo** do manager — valida o JWT (HMAC512)          |
+| `DEPLOY_HOST`                     | Host usado pelo `deploy-production.sh`                         |
 
 ## Arquitetura
 
@@ -90,7 +93,7 @@ vem sempre do JWT, nunca do corpo/parâmetro da requisição.
 O listener Kafka **não transcreve**: só persiste a tarefa e confirma o offset. Processadores agendados executam:
 
 ```
-manager ──Kafka (KAFKA_MANAGER_IA_CDR_TOPIC)──> IaCdrListener ──> transcription (PENDING), 1 por arquivo de callRecords
+manager ──Kafka (KAFKA_MANAGER_IA_CDR_TOPIC)──> IaCdrListener ──> transcription (PENDING), 1 por gravação em recordNames
 TranscriptionProcessor (@Scheduled + virtual threads, concorrência limitada)
     ├─ RecordingStorage (S3)      → baixa o .mp3
     ├─ TranscriptionProvider       → Deepgram (nova-3, pt-BR, diarize, utterances, punctuate, smart_format)
@@ -100,10 +103,11 @@ TranscriptionProcessor (@Scheduled + virtual threads, concorrência limitada)
 AgentRunProcessor (fase 2) → ChatClient/OpenRouter → agent_run DONE + usage_record (tokens/custo)
 ```
 
-- **Idempotência:** chave única `(company_id, cdr_unique_id, record_file)`; mensagem repetida é ignorada.
+- **Idempotência:** chave única `(company_id, cdr_unique_id, record_name)`; mensagem repetida é ignorada.
 - **Estados:** `PENDING → PROCESSING → DONE`; `RETRY` (backoff exponencial via `attempts`/`next_attempt_at`) →
-  `FAILED` após o limite; `SKIPPED` quando a CDR não tem gravação.
-- **Gravação ainda não existe no S3** é esperado (o vip-worker converte e sobe de forma assíncrona) → `RETRY`.
+  `FAILED` após o limite. CDR sem gravação é ignorada (só log).
+- **Gravação ainda não existe no S3** é esperado: o vip-worker publica a CDR **antes** de converter e subir o
+  `.mp3` (`CdrService.sendCdr` no worker) → `RETRY`.
 - No boot, tarefas presas em `PROCESSING` voltam para `RETRY`.
 - Integrações externas (Deepgram, S3, ChatModel) ficam **atrás de interfaces próprias** para serem trocadas por
   fakes nos testes. Nunca chame a Deepgram ou o OpenRouter reais em testes.
