@@ -86,8 +86,18 @@ class DeepgramTranscriptionProviderTest {
     }
 
     @Test
-    fun `erro 401 nao e retentavel`() {
-        givenDeepgramThrows(DeepgramHttpException("nao autorizado", 401, "Invalid credentials"))
+    fun `erros de conta 401, 402 e 403 sao retentaveis`() {
+        // chave expirada ou saldo esgotado nao pode marcar todas as tarefas como FAILED de uma vez
+        listOf(401, 402, 403).forEach { status ->
+            givenDeepgramThrows(DeepgramHttpException("conta", status, "erro de conta"))
+
+            assertTrue(assertThrows<TranscriptionFailedException> { provider.transcribe(audio) }.retryable, "HTTP $status")
+        }
+    }
+
+    @Test
+    fun `erro 413 nao e retentavel`() {
+        givenDeepgramThrows(DeepgramHttpException("grande demais", 413, "Payload Too Large"))
 
         assertFalse(assertThrows<TranscriptionFailedException> { provider.transcribe(audio) }.retryable)
     }

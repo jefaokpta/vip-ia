@@ -34,7 +34,8 @@ class DeepgramTranscriptionProvider(
             client.listen().v1().media().transcribeFile(request)
         } catch (e: DeepgramHttpException) {
             val status = e.statusCode()
-            val retryable = status == 408 || status == 429 || status >= 500
+            // 401/402/403 = chave ou saldo: problema da conta, não do áudio — retenta em vez de FAILED em massa
+            val retryable = status in RETRYABLE_STATUS || status >= 500
             throw TranscriptionFailedException("Deepgram HTTP $status: ${e.body()}", retryable, e)
         } catch (e: DeepgramApiException) {
             throw TranscriptionFailedException("Falha de comunicacao com a Deepgram: ${e.message}", true, e)
@@ -46,5 +47,9 @@ class DeepgramTranscriptionProvider(
             override fun visit(value: ListenV1AcceptedResponse): TranscriptionResult =
                 throw TranscriptionFailedException("Deepgram respondeu em modo callback sem callback configurado", false)
         })
+    }
+
+    private companion object {
+        val RETRYABLE_STATUS = setOf(401, 402, 403, 408, 429)
     }
 }
