@@ -1,0 +1,28 @@
+CREATE TABLE transcription
+(
+    id                  BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+    company_id          VARCHAR(255)  NOT NULL,
+    cdr_unique_id       VARCHAR(255)  NOT NULL,
+    record_name         VARCHAR(255)  NOT NULL,
+    status              VARCHAR(20)   NOT NULL,
+    attempts            INT           NOT NULL DEFAULT 0,
+    next_attempt_at     DATETIME(3)   NOT NULL,
+    last_error          VARCHAR(1000) NULL,
+    call_start_time     DATETIME(3)   NOT NULL,
+    src                 VARCHAR(255)  NOT NULL,
+    destination         VARCHAR(255)  NOT NULL,
+    peer                VARCHAR(255)  NOT NULL,
+    disposition         VARCHAR(50)   NOT NULL,
+    userfield           VARCHAR(255)  NOT NULL,
+    call_duration       INT           NOT NULL,
+    audio_seconds       DOUBLE        NULL,
+    language            VARCHAR(20)   NULL,
+    model               VARCHAR(50)   NULL,
+    deepgram_request_id VARCHAR(255)  NULL,
+    transcript          MEDIUMTEXT    NULL,
+    created_at          DATETIME(3)   NOT NULL,
+    updated_at          DATETIME(3)   NOT NULL,
+    UNIQUE KEY uk_transcription_cdr_record (company_id, cdr_unique_id, record_name),
+    INDEX idx_transcription_company_start (company_id, call_start_time),
+    INDEX idx_transcription_due (status, next_attempt_at)
+);
