@@ -1,0 +1,13 @@
+{
+  "companyId": "100023",
+  "uniqueId": "1772633126.1880",
+  "startTime": 1772633126000,
+  "duration": 8,
+  "billableSeconds": 2,
+  "src": "12_100023",
+  "destination": "1132931515",
+  "peer": "12",
+  "disposition": "ANSWERED",
+  "userfield": "OUTBOUND",
+  "recordNames": ["100023-1772633126.1880-MIXED"]
+}
