@@ -7,7 +7,7 @@ import br.com.vipsolutions.vipia.transcription.provider.Utterance
 class FakeTranscriptionProvider : TranscriptionProvider {
 
     var result: TranscriptionResult = sampleResult()
-    var error: Exception? = null
+    var error: Throwable? = null
     var calls = 0
 
     override fun transcribe(audio: ByteArray): TranscriptionResult {

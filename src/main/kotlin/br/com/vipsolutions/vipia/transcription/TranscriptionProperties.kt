@@ -17,4 +17,6 @@ data class TranscriptionProperties(
     val retryBaseDelay: Duration,
     /** Idioma enviado à Deepgram (BCP-47). */
     val language: String,
+    /** Tarefa em PROCESSING sem atualização há mais que isso é considerada presa e volta para RETRY. */
+    val stuckTimeout: Duration = Duration.ofMinutes(10),
 )

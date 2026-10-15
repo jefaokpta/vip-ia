@@ -29,7 +29,10 @@ class TranscriptionProcessor(
     private val logger = LoggerFactory.getLogger(this::class.java)
 
     fun processDueTasks(): Int {
-        val due = repository.findDue(clock.instant(), properties.batchSize)
+        val now = clock.instant()
+        val stale = repository.resetStale(now.minus(properties.stuckTimeout), now)
+        if (stale > 0) logger.warn("$stale transcricao(oes) presa(s) em PROCESSING devolvida(s) para RETRY")
+        val due = repository.findDue(now, properties.batchSize)
         if (due.isEmpty()) return 0
         val permits = Semaphore(properties.maxConcurrency)
         Executors.newVirtualThreadPerTaskExecutor().use { executor ->
@@ -38,6 +41,9 @@ class TranscriptionProcessor(
                     permits.acquire()
                     try {
                         processOne(task)
+                    } catch (e: Throwable) {
+                        // sem isso a exceção fica no Future descartado e a tarefa some em PROCESSING sem log
+                        logger.error("${task.cdrUniqueId} >> falha ao registrar resultado de ${task.recordName}", e)
                     } finally {
                         permits.release()
                     }
@@ -59,7 +65,7 @@ class TranscriptionProcessor(
             registerFailure(task, e.message ?: "Gravacao nao encontrada", retryable = true)
         } catch (e: TranscriptionFailedException) {
             registerFailure(task, e.message ?: "Falha na transcricao", e.retryable)
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             logger.error("${task.cdrUniqueId} >> erro inesperado ao transcrever ${task.recordName}", e)
             registerFailure(task, e.message ?: e.javaClass.simpleName, retryable = true)
         }

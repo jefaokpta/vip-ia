@@ -72,6 +72,18 @@ interface TranscriptionRepository : CrudRepository<TranscriptionEntity, Long> {
     @Query("UPDATE transcription SET status = 'RETRY', next_attempt_at = :now, updated_at = :now WHERE status = 'PROCESSING'")
     fun resetStuck(@Param("now") now: Instant): Int
 
+    /**
+     * Varredura periódica: PROCESSING parado desde antes de staleBefore (thread morreu, banco caiu no meio) volta
+     * para a fila contando como uma tentativa, para uma gravação problemática não ser reprocessada sem fim.
+     */
+    @Modifying
+    @Query(
+        """UPDATE transcription
+           SET status = 'RETRY', attempts = attempts + 1, next_attempt_at = :now, updated_at = :now
+           WHERE status = 'PROCESSING' AND updated_at < :staleBefore"""
+    )
+    fun resetStale(@Param("staleBefore") staleBefore: Instant, @Param("now") now: Instant): Int
+
     @Modifying
     @Query(
         """UPDATE transcription

@@ -132,6 +132,33 @@ class TranscriptionProcessorTest : IntegrationTest() {
     }
 
     @Test
+    fun `Error fora da hierarquia de Exception tambem vira RETRY`() {
+        val task = repository.save(Fixtures.task())
+        givenAudio(task)
+        provider.error = AssertionError("erro grave")
+
+        processor.processDueTasks()
+
+        assertEquals(TranscriptionStatus.RETRY, repository.findById(task.id!!).get().status)
+    }
+
+    @Test
+    fun `tarefa presa em PROCESSING alem do timeout volta para a fila e e processada`() {
+        val stuckSince = NOW.minus(properties.stuckTimeout).minusSeconds(1)
+        val stuck = repository.save(Fixtures.task(status = TranscriptionStatus.PROCESSING).copy(updatedAt = stuckSince))
+        val recent = repository.save(Fixtures.task(recordName = "recente", status = TranscriptionStatus.PROCESSING))
+        givenAudio(stuck)
+
+        processor.processDueTasks()
+
+        repository.findById(stuck.id!!).get().let {
+            assertEquals(TranscriptionStatus.DONE, it.status)
+            assertEquals(1, it.attempts)
+        }
+        assertEquals(TranscriptionStatus.PROCESSING, repository.findById(recent.id!!).get().status)
+    }
+
+    @Test
     fun `tarefa ja reivindicada por outro nao e processada`() {
         val task = repository.save(Fixtures.task())
         givenAudio(task)

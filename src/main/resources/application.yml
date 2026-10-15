@@ -51,6 +51,8 @@ vip-ia:
     max-attempts: 6
     retry-base-delay: PT1M
     language: pt-BR
+    # maior que deepgram.timeout-seconds + download do S3
+    stuck-timeout: PT10M
 
 management:
   endpoints:
