@@ -1,0 +1,64 @@
+server:
+  port: ${SERVER_PORT:8083}
+spring:
+  application:
+    name: vip-ia
+  threads:
+    virtual:
+      enabled: true
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  sql:
+    init:
+      mode: never
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS}
+    sasl:
+      username: ${KAFKA_SASL_USERNAME}
+      password: ${KAFKA_SASL_PASSWORD}
+    consumer:
+      group-id: ${KAFKA_GROUP_ID}
+      client-id: vip-ia-consumer
+      ia-cdr-topic: ${KAFKA_MANAGER_IA_CDR_TOPIC}
+
+aws:
+  s3:
+    region: ${AWS_S3_REGION}
+    recordings:
+      bucket: ${AWS_S3_RECORDINGS_BUCKET}
+
+deepgram:
+  api-key: ${DEEPGRAM_API_KEY}
+  timeout-seconds: 300
+
+auth:
+  jwt:
+    secret: ${AUTH_JWT_SECRET}
+
+vip-ia:
+  kafka:
+    listener:
+      auto-startup: true
+  scheduling:
+    enabled: true
+  transcription:
+    poll-interval: PT10S
+    batch-size: 20
+    max-concurrency: 4
+    max-attempts: 6
+    retry-base-delay: PT1M
+    language: pt-BR
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,prometheus
+      discovery:
+        enabled: false
+  endpoint:
+    health:
+      show-details: never

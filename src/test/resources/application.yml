@@ -1,0 +1,64 @@
+server:
+  port: 8083
+spring:
+  application:
+    name: vip-ia-test
+  threads:
+    virtual:
+      enabled: true
+  datasource:
+    url: jdbc:h2:mem:vipia;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE;MODE=MySQL;DATABASE_TO_LOWER=TRUE;CASE_INSENSITIVE_IDENTIFIERS=TRUE
+    username: sa
+    password:
+    driver-class-name: org.h2.Driver
+  sql:
+    init:
+      mode: always
+  kafka:
+    bootstrap-servers: localhost:9092
+    sasl:
+      username: test-user
+      password: test-password
+    consumer:
+      group-id: test-group
+      client-id: test-client
+      ia-cdr-topic: test-ia-cdr-topic
+
+aws:
+  s3:
+    region: us-east-1
+    recordings:
+      bucket: recordings-bucket-test
+
+deepgram:
+  api-key: test-deepgram-key
+  timeout-seconds: 30
+
+auth:
+  jwt:
+    secret: test-secret
+
+vip-ia:
+  kafka:
+    listener:
+      auto-startup: false
+  scheduling:
+    enabled: false
+  transcription:
+    poll-interval: PT10S
+    batch-size: 20
+    max-concurrency: 4
+    max-attempts: 6
+    retry-base-delay: PT1M
+    language: pt-BR
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,prometheus
+      discovery:
+        enabled: false
+  endpoint:
+    health:
+      show-details: never

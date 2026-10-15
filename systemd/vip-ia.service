@@ -1,0 +1,16 @@
+[Unit]
+Description=VIP IA - TRANSCRICAO E AGENTES DE IA
+After=network.target
+
+[Service]
+StandardOutput=journal
+StandardError=journal
+WorkingDirectory=/opt/vip-ia
+## Usando SDKMAN o Java fica em /root/.sdkman/candidates/java/current/bin/java
+ExecStart=/root/.sdkman/candidates/java/current/bin/java -jar vip-ia.jar
+SuccessExitStatus=143
+
+EnvironmentFile=/opt/vip-ia/.env
+
+[Install]
+WantedBy=multi-user.target
