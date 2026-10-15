@@ -10,8 +10,17 @@ import org.springframework.test.web.servlet.MockMvc
 /**
  * Base dos testes que usam o contexto Spring + H2. Um único contexto é compartilhado (cache do Spring), então
  * cada teste começa limpando as tabelas.
+ *
+ * As propriedades abaixo são fixadas aqui porque o ./tests.sh carrega o .env e variáveis como AUTH_JWT_SECRET
+ * (mesmo vazias) têm precedência sobre o application.yml de teste.
  */
-@SpringBootTest
+@SpringBootTest(
+    properties = [
+        "auth.jwt.secret=" + TestTokens.SECRET,
+        "aws.s3.region=us-east-1",
+        "aws.s3.recordings.bucket=recordings-bucket-test",
+    ]
+)
 @AutoConfigureMockMvc
 abstract class IntegrationTest {
 
