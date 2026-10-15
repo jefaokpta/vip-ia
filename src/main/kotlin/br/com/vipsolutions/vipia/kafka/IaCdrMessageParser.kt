@@ -19,11 +19,11 @@ class IaCdrMessageParser(private val objectMapper: ObjectMapper) {
         val message = try {
             objectMapper.readValue(payload, IaCdrMessage::class.java)
         } catch (e: JacksonException) {
-            logger.warn("Mensagem de CDR invalida descartada: ${e.originalMessage} | payload=${payload.take(500)}")
+            logger.warn("Mensagem de CDR invalida descartada: ${e.originalMessage} | tamanho=${payload.length}")
             return null
         }
         if (message.companyId.isBlank() || message.uniqueId.isBlank()) {
-            logger.warn("Mensagem de CDR sem companyId/uniqueId descartada | payload=${payload.take(500)}")
+            logger.warn("Mensagem de CDR sem companyId/uniqueId descartada | tamanho=${payload.length}")
             return null
         }
         return message
