@@ -109,6 +109,8 @@ AgentRunProcessor (fase 2) → ChatClient/OpenRouter → agent_run DONE + usage_
 - **Gravação ainda não existe no S3** é esperado: o vip-worker publica a CDR **antes** de converter e subir o
   `.mp3` (`CdrService.sendCdr` no worker) → `RETRY`.
 - No boot, tarefas presas em `PROCESSING` voltam para `RETRY`.
+- **Instância única:** o vip-ia roda com **uma** instância por banco — o `StuckTranscriptionRecovery` devolve
+  para `RETRY` tudo que está em `PROCESSING` no boot. Escalar horizontalmente exige rever isso.
 - Integrações externas (Deepgram, S3, ChatModel) ficam **atrás de interfaces próprias** para serem trocadas por
   fakes nos testes. Nunca chame a Deepgram ou o OpenRouter reais em testes.
 
