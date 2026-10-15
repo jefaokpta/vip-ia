@@ -38,7 +38,7 @@ geradas por agentes de IA que o próprio cliente escolhe (ou cria) e aplica às 
 
 | Tema | Decisão |
 |------|---------|
-| Stack | Kotlin 2.3.21, **Spring Boot 4.1.x** (mesmas versões do vip-worker), JDK 21 (virtual threads), Spring Data JDBC, MySQL 8 próprio |
+| Stack | Kotlin 2.3.21, **Spring Boot 4.1.x** (Boot 4.1.1), JDK 25 (virtual threads), Spring Data JDBC, MySQL 8 próprio |
 | Transcrição | **Deepgram Java SDK 0.11.1** — `transcribeFile(MediaTranscribeRequestOctetStream)` com `nova-3`, `pt-BR`, `diarize`, `utterances`, `punctuate`, `smart_format` |
 | LLM | **Spring AI 2.x** (`spring-ai-starter-model-openai`) com `base-url` do OpenRouter; modelo definido por agente |
 | Entrada | Tópico **novo publicado pelo manager** (`KAFKA_MANAGER_IA_CDR_TOPIC`); o vip-ia **não** consome `KAFKA_WORKER_CDR_TOPIC` |
@@ -102,7 +102,7 @@ Tópico `KAFKA_MANAGER_IA_CDR_TOPIC`, JSON:
 {
   "companyId": "100023",
   "uniqueId": "1772633126.1880",
-  "startTime": "2026-03-04T11:05:26-03:00",
+  "startTime": 1772633126000,
   "duration": 8,
   "billableSeconds": 2,
   "src": "12_100023",

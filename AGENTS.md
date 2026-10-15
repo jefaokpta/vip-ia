@@ -36,8 +36,8 @@ Resumo do que o serviço faz (detalhes em `MANIFESTO.md`):
 
 ## Stack
 
-- **Kotlin 2.3.21**, **JDK 21** com **virtual threads** (`spring.threads.virtual.enabled=true`) — mesmas versões do vip-worker.
-- **Spring Boot 4.1.x** — Jackson 3 (`tools.jackson.*`) é o padrão; configure o compilador Kotlin com
+- **Kotlin 2.3.21**, **JDK 25** com **virtual threads** (`spring.threads.virtual.enabled=true`), Gradle 9.8.1.
+- **Spring Boot 4.1.1** (`spring-boot-starter-webmvc`) — Jackson 3 (`tools.jackson.*`) é o padrão; configure o compilador Kotlin com
   `-Xannotation-default-target=param-property` (recomendação da doc do Boot 4).
 - **Spring AI 2.x** (fase 2) — `spring-ai-starter-model-openai` apontado para o OpenRouter via
   `spring.ai.openai.base-url=https://openrouter.ai/api`; o modelo de cada agente é passado por `OpenAiChatOptions`.
@@ -120,7 +120,9 @@ AgentRunProcessor (fase 2) → ChatClient/OpenRouter → agent_run DONE + usage_
   `companyId`, `tenantId`, `roles` (e `managingCompany`, quando presente). **Não há login no vip-ia.**
 - Roles vêm do `RoleEnum` do manager (cumulativas): agentes da empresa exigem `ROLE_COMPANY_ADMIN`; agentes da
   plataforma (`owner_company_id = NULL`) exigem `ROLE_SAAS_ADMIN`; `/internal/usage` exige `ROLE_SAAS_FINANCE`.
-- Liberados sem token: apenas `/actuator/health` e `/actuator/prometheus` (proteção de rede, como nos outros apps).
+- Liberados sem token: apenas `/actuator/health` e `/actuator/prometheus` (proteção de rede, como nos outros apps)
+  e `/error`. O `/error` precisa ficar aberto: com sessão stateless, o dispatch de erro (404/409/403) chega sem
+  autenticação e viraria 401.
 
 ### Contrato Kafka
 
@@ -140,7 +142,12 @@ manager tem o contrato espelhado.
 ## Testes
 
 - H2 em memória (modo MySQL), schema via `src/test/resources/schema.sql`.
-- Kafka auto-configuration excluída nos testes.
+- Listener Kafka (`vip-ia.kafka.listener.auto-startup=false`) e agendamento (`vip-ia.scheduling.enabled=false`)
+  desligados nos testes; os processadores são chamados direto.
+- O `./tests.sh` carrega o `.env`, e variáveis de ambiente **sobrescrevem** o `application.yml` de teste
+  (ex.: `AUTH_JWT_SECRET` vazio). Propriedades que os testes dependem são fixadas em
+  `IntegrationTest` via `@SpringBootTest(properties = [...])`.
+- No Spring Data JDBC 4, insert duplicado lança `DuplicateKeyException` direto (não `DbActionExecutionException`).
 - Fakes para `RecordingStorage`, `TranscriptionProvider` e `ChatModel`.
 - Testes de segurança obrigatórios para endpoints novos: sem token, token inválido, isolamento por `companyId` e,
   na fase 2, visibilidade de agentes (`PRIVATE` x `PUBLIC`).
