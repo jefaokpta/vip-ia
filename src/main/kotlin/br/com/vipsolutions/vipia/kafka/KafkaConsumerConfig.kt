@@ -40,6 +40,7 @@ class KafkaConsumerConfig(
     fun iaCdrListenerContainerFactory(): ConcurrentKafkaListenerContainerFactory<String, String> {
         val factory = ConcurrentKafkaListenerContainerFactory<String, String>()
         factory.setConsumerFactory(iaCdrConsumerFactory())
+        factory.setCommonErrorHandler(IaCdrErrorHandling.errorHandler())
         return factory
     }
 }
