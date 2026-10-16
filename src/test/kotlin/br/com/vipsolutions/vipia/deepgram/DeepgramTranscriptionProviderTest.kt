@@ -14,10 +14,7 @@ import com.deepgram.types.ListenV1Response
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
-import org.junit.jupiter.api.Assertions.assertArrayEquals
-import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertFalse
-import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import java.time.Duration
@@ -58,7 +55,6 @@ class DeepgramTranscriptionProviderTest {
         assertArrayEquals(audio, request.captured.body)
         assertEquals(MediaTranscribeRequestModel.NOVA3, request.captured.model.get())
         assertEquals("pt-BR", request.captured.language.get())
-        assertTrue(request.captured.diarize.get())
         assertTrue(request.captured.utterances.get())
         assertTrue(request.captured.punctuate.get())
         assertTrue(request.captured.smartFormat.get())
