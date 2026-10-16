@@ -8,6 +8,7 @@ import com.deepgram.DeepgramClient
 import com.deepgram.core.DeepgramApiException
 import com.deepgram.core.DeepgramHttpException
 import com.deepgram.resources.listen.v1.media.requests.MediaTranscribeRequestOctetStream
+import com.deepgram.resources.listen.v1.media.types.MediaTranscribeRequestDiarizeModel
 import com.deepgram.resources.listen.v1.media.types.MediaTranscribeRequestModel
 import com.deepgram.resources.listen.v1.media.types.MediaTranscribeResponse
 import com.deepgram.types.ListenV1AcceptedResponse
@@ -25,7 +26,8 @@ class DeepgramTranscriptionProvider(
             .body(audio)
             .model(MediaTranscribeRequestModel.NOVA3)
             .language(properties.language)
-            .diarize(true)
+//            .diarize(true)
+            .diarizeModel(MediaTranscribeRequestDiarizeModel.V1)
             .utterances(true)
             .punctuate(true)
             .smartFormat(true)
