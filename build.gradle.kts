@@ -51,4 +51,23 @@ kotlin {
 
 tasks.withType<Test> {
     useJUnitPlatform()
+
+    testLogging {
+        events("passed", "skipped", "failed")
+        exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
+        showExceptions = true
+        showCauses = true
+        showStackTraces = true
+        showStandardStreams = true
+    }
+
+    afterSuite(
+        KotlinClosure2<TestDescriptor, TestResult, Unit>({ descriptor, result ->
+            if (descriptor.parent == null) {
+                println()
+                println("Resultado dos testes:")
+                println("${result.testCount} executados, ${result.successfulTestCount} passaram, ${result.failedTestCount} falharam, ${result.skippedTestCount} ignorados")
+            }
+        })
+    )
 }
