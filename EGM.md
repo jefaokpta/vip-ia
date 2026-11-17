@@ -27,7 +27,7 @@ HTTP (JWT do manager)
   - [`recording`](./src/main/kotlin/br/com/vipsolutions/vipia/recording/EGM.md) - leitura das gravações no S3.
   - [`usage`](./src/main/kotlin/br/com/vipsolutions/vipia/usage/EGM.md) - registro de consumo de provedores e API `/internal/usage`.
   - [`config`](./src/main/kotlin/br/com/vipsolutions/vipia/config/EGM.md) / [`common`](./src/main/kotlin/br/com/vipsolutions/vipia/common/EGM.md) - `Clock` UTC, agendamento condicional, `PageResponse`.
-  - [`resources`](./src/main/resources/db/migration/EGM.md) - `application.yml` e [`db/migration`](./src/main/resources/db/migration/EGM.md) (DDL).
+  - [`resources`](./src/main/resources/EGM.md) - `application.yml` e [`db/migration`](./src/main/resources/db/migration/EGM.md) (DDL).
 
 ## Global Invariants
 - Isolamento por empresa: toda leitura de `/transcriptions` usa o `companyId` do JWT; recurso de outra empresa responde `404`.
